@@ -1,0 +1,90 @@
+service: notes-crud-api
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ap-southeast-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    NOTES_TABLE_NAME: !Ref notesTable
+
+plugins:
+  - serverless-iam-roles-per-function
+
+functions:
+  createNote:
+    handler: handler.createNote
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - "dynamodb:PutItem"
+        Resource: !GetAtt notesTable.Arn
+    events:
+      - http:
+          path: notes
+          method: post
+
+  updateNote:
+    handler: handler.updateNote
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - "dynamodb:UpdateItem"
+        Resource: !GetAtt notesTable.Arn
+    events:
+      - http:
+          path: notes/{id}
+          method: put
+
+  deleteNote:
+    handler: handler.deleteNote
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - "dynamodb:DeleteItem"
+        Resource: !GetAtt notesTable.Arn
+    events:
+      - http:
+          path: notes/{id}
+          method: delete
+
+  getAllNotes:
+    handler: handler.getAllNotes
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - "dynamodb:Scan"
+          - "dynamodb:GetItem"
+        Resource: !GetAtt notesTable.Arn
+    events:
+      - http:
+          path: notes
+          method: get
+
+  getNote:
+    handler: handler.getNote
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - "dynamodb:GetItem"
+          - "dynamodb:Query"
+        Resource: !GetAtt notesTable.Arn
+    events:
+      - http:
+          path: notes/{id}
+          method: get
+
+resources:
+  Resources:
+    notesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        BillingMode: PAY_PER_REQUEST
+        TableName: notes-dev
+        KeySchema:
+          - AttributeName: noteId
+            KeyType: HASH
+        AttributeDefinitions:
+          - AttributeName: noteId
+            AttributeType: S
