@@ -6,13 +6,30 @@ provider:
   runtime: nodejs20.x
   region: ap-southeast-1
   stage: ${opt:stage, 'dev'}
+  # apiGateway:
+  #   apiKeys:
+  #     - name: api-key-${self:provider.stage}
+  #       value: super-secret-api-key-${self:provider.stage}
+  #   usagePlan:
+  #     throttle:
+  #       rateLimit: 100 # 100 requests per second
+  #       burstLimit: 10 # 10 requests concurrent burst limit
+  #     quota:
+  #       limit: 100 # 1000 requests per day
+  #       period: DAY
+  #       offset: 0 # start of the day
   environment:
     NOTES_TABLE_NAME: !Ref notesTable
+    COGNITO_USERPOOL_ID: !Ref cognitoUserPool
+    COGNITO_WEB_CLIENT_ID: !Ref cognitoUserPoolWebClient
 
 plugins:
   - serverless-iam-roles-per-function
 
 functions:
+  authorizer:
+    handler: authorizer.handler
+
   createNote:
     handler: handler.createNote
     iamRoleStatements:
@@ -24,6 +41,11 @@ functions:
       - http:
           path: notes
           method: post
+          authorizer:
+            name: authorizer
+            type: TOKEN
+            identitySource: method.request.header.Authorization
+          private: true
 
   updateNote:
     handler: handler.updateNote
@@ -36,6 +58,11 @@ functions:
       - http:
           path: notes/{id}
           method: put
+          authorizer:
+            name: authorizer
+            type: TOKEN
+            identitySource: method.request.header.Authorization
+          private: true
 
   deleteNote:
     handler: handler.deleteNote
@@ -48,6 +75,11 @@ functions:
       - http:
           path: notes/{id}
           method: delete
+          authorizer:
+            name: authorizer
+            type: TOKEN
+            identitySource: method.request.header.Authorization
+          private: true
 
   getAllNotes:
     handler: handler.getAllNotes
@@ -61,7 +93,11 @@ functions:
       - http:
           path: notes
           method: get
-
+          authorizer:
+            name: userpool_authorizer
+            arn: !GetAtt cognitoUserPool.Arn
+            type: COGNITO_USER_POOLS
+            identitySource: method.request.header.Authorization
   getNote:
     handler: handler.getNote
     iamRoleStatements:
@@ -74,17 +110,11 @@ functions:
       - http:
           path: notes/{id}
           method: get
+          authorizer:
+            name: authorizer
+            type: TOKEN
+            identitySource: method.request.header.Authorization
+          private: true
 
 resources:
-  Resources:
-    notesTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        BillingMode: PAY_PER_REQUEST
-        TableName: notes-dev
-        KeySchema:
-          - AttributeName: noteId
-            KeyType: HASH
-        AttributeDefinitions:
-          - AttributeName: noteId
-            AttributeType: S
+  Resources: ${file(resources.yml)}
